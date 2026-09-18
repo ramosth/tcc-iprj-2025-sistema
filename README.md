@@ -277,7 +277,7 @@ curl http://localhost:3001/api/sensor/status
 ```bash
 curl -X POST http://localhost:3001/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@bndmet.com","senha":"admin123"}'
+  -d '{"email":"admin@bndmet.com","senha":"Admin123"}'
 ```
 
 ### 4. Enviar dados de sensor (payload completo)
