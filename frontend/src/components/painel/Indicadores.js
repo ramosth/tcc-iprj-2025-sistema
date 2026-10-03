@@ -1,7 +1,8 @@
 // ============= src/components/painel/Indicadores.js =============
 // S, P48, P24 e P72 da última leitura, com os limiares de referência.
-// Dados de chuva incompletos: P48 com dia sem registro e P72 nulo aparecem como
-// valor mínimo ("≥ X mm"), usando p48DiasNulos e p72Minimo enviados pelo firmware.
+// Dados de chuva incompletos (chuvaIncompleta = true): o cartão P72 mostra
+// "Dados de chuva incompletos — P72 ≥ <p72Minimo> mm". P48 com p48DiasNulos > 0
+// aparece como mínimo ("≥ X mm"). "Sem dados de chuva" só com semDadosChuva = true.
 'use client';
 
 import { LIMIARES } from '@/config/niveis';
@@ -14,7 +15,35 @@ function faixa(valor, atencao, alerta) {
   return 'Abaixo do limiar de atenção';
 }
 
-function Indicador({ sigla, nome, valor, unidade, indisponivel, naoUsado, detalhe, situacao }) {
+// Com valor mínimo, "abaixo" não é certeza: o valor real pode ser maior.
+function faixaMinimo(minimo, atencao, alerta) {
+  if (minimo === null || minimo === undefined) return null;
+  if (minimo >= alerta) return 'Mínimo acima do limiar de alerta';
+  if (minimo >= atencao) return 'Mínimo acima do limiar de atenção';
+  return 'Mínimo abaixo do limiar de atenção (o valor real pode ser maior)';
+}
+
+// Cartão do P72 quando chuvaIncompleta = true: a frase substitui o valor de P72.
+function IndicadorP72Incompleto({ minimo }) {
+  const temMinimo = minimo !== null && minimo !== undefined;
+  return (
+    <article className="indicador indicador-incompleto">
+      <p className="indicador-sigla">
+        P72 <span>chuva de 72 h</span>
+      </p>
+      <p className="indicador-valor indicador-valor-texto">
+        Dados de chuva incompletos — P72 ≥ {temMinimo ? numero(minimo, 1) : '?'} mm
+      </p>
+      {temMinimo && <p className="indicador-situacao">{faixaMinimo(minimo, LIMIARES.P1, LIMIARES.P2)}</p>}
+      <p className="indicador-detalhe">
+        Soma do que foi obtido (mínimo garantido). Atenção ≥ {LIMIARES.P1} mm · Alerta ≥ {LIMIARES.P2} mm (
+        {LIMIARES.fonteP}).
+      </p>
+    </article>
+  );
+}
+
+function Indicador({ sigla, nome, valor, unidade, indisponivel, textoIndisponivel, naoUsado, detalhe, situacao }) {
   if (naoUsado) {
     return (
       <article className="indicador">
@@ -33,7 +62,7 @@ function Indicador({ sigla, nome, valor, unidade, indisponivel, naoUsado, detalh
         {sigla} <span>{nome}</span>
       </p>
       <p className="indicador-valor">
-        {indisponivel ? 'indisponível' : valor}
+        {indisponivel ? textoIndisponivel || 'indisponível' : valor}
         {!indisponivel && unidade && <small> {unidade}</small>}
       </p>
       {situacao && !indisponivel && <p className="indicador-situacao">{situacao}</p>}
@@ -49,12 +78,8 @@ export default function Indicadores({ leitura }) {
   const semP48 = !leitura || l.p48Indisponivel || l.P48 === null;
   const semP24 = !leitura || l.p24Indisponivel || l.P24 === null;
   const p48Minimo = !semP48 && l.p48DiasNulos > 0; // dia sem registro: P48 é um mínimo
-  const temMinimoP72 = l.P72 === null && !!l.chuvaIncompleta && l.p72Minimo !== null && l.p72Minimo !== undefined;
-  const semP72 = !leitura || (l.P72 === null && !temMinimoP72);
-  const valorP72 = temMinimoP72 ? `≥ ${numero(l.p72Minimo, 1)}` : numero(l.P72, 1);
-  const detalheP72 = temMinimoP72
-    ? `Dados incompletos: soma do que foi obtido (mínimo garantido). Atenção ≥ ${LIMIARES.P1} mm · Alerta ≥ ${LIMIARES.P2} mm (${LIMIARES.fonteP}).`
-    : `P48 + P24. Atenção ≥ ${LIMIARES.P1} mm · Alerta ≥ ${LIMIARES.P2} mm (${LIMIARES.fonteP}).`;
+  const incompleta = !!leitura && !!l.chuvaIncompleta && !l.semDadosChuva && !l.p72Injetado;
+  const semP72 = !leitura || l.P72 === null;
 
   return (
     <section className="indicadores" aria-label="Variáveis da última leitura">
@@ -75,7 +100,7 @@ export default function Indicadores({ leitura }) {
         naoUsado={injetado && l.P48 === null}
         detalhe={
           p48Minimo
-            ? `Acumulada nas últimas 48 h (BNDMET). ${l.p48DiasNulos} dia(s) sem registro na estação: valor mínimo.`
+            ? `Acumulada nas últimas 48 h (BNDMET). ${l.p48DiasNulos} dia(s) sem registro na estação BNDMET: valor mínimo.`
             : 'Acumulada nas últimas 48 h (BNDMET).'
         }
       />
@@ -88,21 +113,20 @@ export default function Indicadores({ leitura }) {
         naoUsado={injetado && l.P24 === null}
         detalhe="Prevista para as próximas 24 h (OpenWeatherMap)."
       />
-      <Indicador
-        sigla="P72"
-        nome={
-          l.p72Injetado
-            ? 'chuva de 72 h (injetada para teste)'
-            : temMinimoP72
-              ? 'chuva de 72 h (incompleta)'
-              : 'chuva de 72 h'
-        }
-        valor={valorP72}
-        unidade="mm"
-        indisponivel={semP72}
-        situacao={faixa(temMinimoP72 ? l.p72Minimo : l.P72, LIMIARES.P1, LIMIARES.P2)}
-        detalhe={detalheP72}
-      />
+      {incompleta ? (
+        <IndicadorP72Incompleto minimo={l.p72Minimo} />
+      ) : (
+        <Indicador
+          sigla="P72"
+          nome={l.p72Injetado ? 'chuva de 72 h (injetada para teste)' : 'chuva de 72 h'}
+          valor={numero(l.P72, 1)}
+          unidade="mm"
+          indisponivel={semP72}
+          textoIndisponivel={l.semDadosChuva ? 'Sem dados de chuva' : undefined}
+          situacao={faixa(l.P72, LIMIARES.P1, LIMIARES.P2)}
+          detalhe={`P48 + P24. Atenção ≥ ${LIMIARES.P1} mm · Alerta ≥ ${LIMIARES.P2} mm (${LIMIARES.fonteP}).`}
+        />
+      )}
     </section>
   );
 }

@@ -28,9 +28,9 @@ function DicaTooltip({ active, payload, campo, campoMinimo, casas, unidade }) {
   const valor = p[campo];
   const minimo = campoMinimo ? p[campoMinimo] : null;
   const u = unidade ? ` ${unidade}` : '';
-  let texto = 'indisponível';
+  let texto = campo === 'P72' && p.semDadosChuva ? 'sem dados de chuva' : 'indisponível';
   if (valor !== null && valor !== undefined) texto = `${numero(valor, casas)}${u}`;
-  else if (minimo !== null && minimo !== undefined) texto = `≥ ${numero(minimo, casas)}${u} (dados incompletos)`;
+  else if (minimo !== null && minimo !== undefined) texto = `≥ ${numero(minimo, casas)}${u} (dados de chuva incompletos)`;
   return (
     <div className="dica-grafico">
       <strong>{dataHora(p.criadoEm)}</strong>

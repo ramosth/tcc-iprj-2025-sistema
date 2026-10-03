@@ -23,32 +23,31 @@ export function avisosDaLeitura(l) {
   }
   if (l.p48Indisponivel) indisponivel('Chuva observada nas últimas 48 h (BNDMET) indisponível.');
   if (l.p24Indisponivel) indisponivel('Previsão de chuva para as próximas 24 h (OpenWeatherMap) indisponível.');
-  if (!l.p48Indisponivel && l.p48DiasNulos > 0) {
-    incompleto(
-      `Chuva observada (BNDMET) com ${l.p48DiasNulos} dia(s) sem registro na estação: P48 é um valor mínimo.`,
-    );
+  if (l.p48DiasNulos > 0) {
+    incompleto(`${l.p48DiasNulos} dia(s) sem registro na estação BNDMET: P48 é um valor mínimo.`);
   }
 
   // A chuva entrou na regra? (P72 completo, ou mínimo garantido >= P1)
   const minimo = l.chuvaIncompleta ? l.p72Minimo : null;
   const minimoUsado = minimo !== null && minimo !== undefined && minimo >= LIMIARES.P1;
 
+  // "Sem dados de chuva" aparece SÓ com semDadosChuva = true (nenhuma parcela obtida)
   if (l.semDadosChuva) {
     indisponivel(
       l.sensorIndisponivel
-        ? 'Sem chuva de 72 h (P72) e sem saturação do solo: o nível não pôde usar nenhuma das duas variáveis.'
-        : 'Sem chuva de 72 h (P72): o nível foi definido só com a saturação do solo.',
+        ? 'Sem dados de chuva e sem saturação do solo: o nível não pôde usar nenhuma das duas variáveis.'
+        : 'Sem dados de chuva (BNDMET e OpenWeatherMap): o nível foi definido só com a saturação do solo.',
     );
   } else if (l.chuvaIncompleta) {
-    const mm = minimo !== null && minimo !== undefined ? `${numero(minimo, 1)} mm` : 'valor não informado';
+    const mm = minimo !== null && minimo !== undefined ? `${numero(minimo, 1)} mm` : '? mm (mínimo não informado)';
     if (minimoUsado) {
-      incompleto(`Chuva de 72 h (P72) incompleta: no mínimo ${mm}. O nível foi definido com esse mínimo.`);
+      incompleto(`Dados de chuva incompletos — P72 ≥ ${mm}. O nível foi definido com esse mínimo.`);
     } else {
       incompleto(
-        `Chuva de 72 h (P72) incompleta: no mínimo ${mm}, abaixo do limiar de atenção (${LIMIARES.P1} mm). ` +
+        `Dados de chuva incompletos — P72 ≥ ${mm}, abaixo do limiar de atenção (${LIMIARES.P1} mm): ` +
           (l.sensorIndisponivel
-            ? 'Sem saturação do solo, o nível não pôde usar nenhuma das duas variáveis.'
-            : 'O nível foi definido como sem dados de chuva (só com a saturação do solo).'),
+            ? 'a chuva não entrou na regra e, sem saturação do solo, o nível não pôde usar nenhuma das duas variáveis.'
+            : 'a chuva não entrou na regra e o nível foi definido só com a saturação do solo.'),
       );
     }
   }

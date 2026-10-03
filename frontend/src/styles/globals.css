@@ -225,3 +225,7 @@ tr.inativo td { color: var(--texto-suave); }
 /* Itens de grade podem encolher (tabelas rolam dentro do cartão em vez de alargar a página) */
 .painel-grade > *, .linha-principal > *, .linha-dupla > *, .graficos > * { min-width: 0; }
 .envio .btn-link, .cartao-login .btn-link { align-self: flex-start; }
+
+/* P72 com dados de chuva incompletos (chuvaIncompleta = true) */
+.indicador-incompleto { background: var(--atencao-fundo); border-color: #fcd34d; }
+.indicador-valor-texto { font-size: 1.05rem; line-height: 1.35; color: var(--amarelo-texto); padding: 0.35rem 0; }
