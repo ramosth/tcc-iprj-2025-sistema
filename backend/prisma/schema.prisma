@@ -1,4 +1,5 @@
 // backend > prisma > schema.prisma
+// Versão v3-simples: 4 tabelas. Deve ficar igual a database/init/01-schema.sql.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,158 +10,75 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model LeiturasSensor {
-  id                      Int      @default(autoincrement())
-  timestamp               DateTime @default(now()) @db.Timestamptz(6)
+// Uma linha por JSON recebido do dispositivo (POST /leituras).
+// Campos de energia ficam nulos quando a leitura vem do protótipo físico.
+model Leitura {
+  id                 Int      @id @default(autoincrement())
+  criadoEm           DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  evento             String   @default("ciclo") @db.VarChar(10) // "ciclo" | "energia"
+  nivel              String   @db.VarChar(10) // "VERDE" | "AMARELO" | "VERMELHO"
+  s                  Decimal? @db.Decimal(4, 2) // saturação relativa (0–1)
+  p48                Decimal? @db.Decimal(7, 2) // mm, BNDMET
+  p24                Decimal? @db.Decimal(7, 2) // mm, OpenWeatherMap
+  p72                Decimal? @db.Decimal(7, 2) // mm, P48 + P24
+  rede               Boolean?
+  vbat               Decimal? @db.Decimal(4, 2) // V
+  estadoBateria      String?  @map("estado_bateria") @db.VarChar(10) // NORMAL | BAIXA | CRITICA | FALHA
+  sensorIndisponivel Boolean  @default(false) @map("sensor_indisponivel")
+  p48Indisponivel    Boolean  @default(false) @map("p48_indisponivel")
+  p24Indisponivel    Boolean  @default(false) @map("p24_indisponivel")
+  semDadosChuva      Boolean  @default(false) @map("sem_dados_chuva")
+  p72Injetado        Boolean  @default(false) @map("p72_injetado")
+  simulacao          Boolean  @default(false)
+  eventos            Evento[]
 
-  // ── Sensor local ─────────────────────────────────────────────────────────
-  umidadeSolo             Decimal? @map("umidade_solo")          @db.Decimal(5, 2)
-  valorAdc                Int?     @map("valor_adc")
-  sensorOk                Boolean? @default(true) @map("sensor_ok")
-  fatorLocal              Decimal? @map("fator_local")           @db.Decimal(5, 3)
-
-  // ── BNDMET ───────────────────────────────────────────────────────────────
-  precipitacaoAtual       Decimal? @map("precipitacao_atual")    @db.Decimal(8, 2)
-  precipitacao24h         Decimal? @map("precipitacao_24h")      @db.Decimal(8, 2)
-  precipitacao7d          Decimal? @map("precipitacao_7d")       @db.Decimal(8, 2)
-  precipitacao30d         Decimal? @map("precipitacao_30d")      @db.Decimal(8, 2)
-  statusApiBndmet         String?  @map("status_api_bndmet")     @db.VarChar(50)
-  qualidadeDadosBndmet    Int?     @map("qualidade_dados_bndmet")
-  estacao                 String?  @map("estacao")               @db.VarChar(20)
-
-  // ── OWM ──────────────────────────────────────────────────────────────────
-  statusApiOwm            String?  @map("status_api_owm")        @db.VarChar(50)
-  temperatura             Decimal?                               @db.Decimal(5, 2)
-  umidadeExterna          Decimal? @map("umidade_externa")       @db.Decimal(5, 2)
-  pressaoAtmosferica      Decimal? @map("pressao_atmosferica")   @db.Decimal(7, 2)
-  velocidadeVento         Decimal? @map("velocidade_vento")      @db.Decimal(5, 2)
-  descricaoTempo          String?  @map("descricao_tempo")       @db.VarChar(100)
-  chuvaAtualOwm           Decimal? @map("chuva_atual_owm")       @db.Decimal(8, 2)
-  chuvaFutura24h          Decimal? @map("chuva_futura_24h")      @db.Decimal(8, 2)
-  intensidadePrevisao     String?  @map("intensidade_previsao")  @db.VarChar(30)
-  fatorIntensidade        Decimal? @map("fator_intensidade")     @db.Decimal(4, 2)
-
-  // ── Análise de risco ─────────────────────────────────────────────────────
-  riscoIntegrado          Decimal? @map("risco_integrado")       @db.Decimal(5, 2)
-  indiceRisco             Int?     @map("indice_risco")
-  nivelAlerta             String?  @map("nivel_alerta")          @db.VarChar(20)
-  recomendacao            String?
-  confiabilidade          Int?
-  amplificado             Boolean? @default(false)
-  taxaVariacaoUmidade     Decimal? @map("taxa_variacao_umidade") @db.Decimal(6, 3)
-
-  // ── Componentes Equação 5 TCC ─────────────────────────────────────────────
-  vLencol                 Decimal? @map("v_lencol")              @db.Decimal(6, 4)
-  vChuvaAtual             Decimal? @map("v_chuva_atual")         @db.Decimal(6, 4)
-  vChuvaHistorica         Decimal? @map("v_chuva_historica")     @db.Decimal(6, 4)
-  vChuvaMensal            Decimal? @map("v_chuva_mensal")        @db.Decimal(6, 4)
-  vChuvaFutura            Decimal? @map("v_chuva_futura")        @db.Decimal(6, 4)
-  vTaxaVariacao           Decimal? @map("v_taxa_variacao")       @db.Decimal(6, 4)
-  vPressao                Decimal? @map("v_pressao")             @db.Decimal(6, 4)
-
-  // ── Status do sistema ────────────────────────────────────────────────────
-  statusSistema           Int?     @map("status_sistema")
-  buzzerAtivo             Boolean? @map("buzzer_ativo")
-  modoManual              Boolean? @map("modo_manual")
-  wifiConectado           Boolean? @map("wifi_conectado")
-
-  // ── Diagnóstico ──────────────────────────────────────────────────────────
-  dadosBrutos             Json?    @map("dados_brutos")
-  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime @updatedAt      @map("updated_at") @db.Timestamptz(6)
-
-  @@id([id, timestamp])
-  @@map("leituras_sensor")
+  @@index([criadoEm])
+  @@map("leituras")
 }
 
-model LogsSistema {
-  id          Int      @default(autoincrement())
-  timestamp   DateTime @default(now()) @db.Timestamptz(6)
-  nivel       String   @db.VarChar(20)
-  componente  String?  @db.VarChar(50)
-  mensagem    String
-  dadosExtras Json?    @map("dados_extras")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+// Registro de tudo o que gera aviso: nível subiu, mudança de energia e
+// e-mails de alerta enviados pelo administrador.
+model Evento {
+  id              Int            @id @default(autoincrement())
+  criadoEm        DateTime       @default(now()) @map("criado_em") @db.Timestamptz(6)
+  tipo            String         @db.VarChar(20) // NIVEL_SUBIU | ENERGIA | ALERTA_MANUAL
+  nivel           String?        @db.VarChar(10)
+  descricao       String
+  leituraId       Int?           @map("leitura_id")
+  administradorId Int?           @map("administrador_id")
+  destinatarios   Int            @default(0)
+  enviados        Int            @default(0)
+  falhas          Int            @default(0)
+  leitura         Leitura?       @relation(fields: [leituraId], references: [id], onDelete: SetNull)
+  administrador   Administrador? @relation(fields: [administradorId], references: [id], onDelete: SetNull)
 
-  @@id([id, timestamp])
-  @@map("logs_sistema")
+  @@index([criadoEm])
+  @@map("eventos")
 }
 
-model Configuracoes {
-  id        Int      @id @default(autoincrement())
-  chave     String   @unique @db.VarChar(100)
-  valor     String?
-  descricao String?
-  tipo      String?  @default("string") @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  @@map("configuracoes")
-}
-
-model UsuariosAdmin {
-  id               String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  nome             String           @db.VarChar(100)
-  email            String           @unique @db.VarChar(255)
-  senhaHash        String           @map("senha_hash") @db.VarChar(255)
-  perfil           String           @default("admin") @db.VarChar(20)
-  ativo            Boolean          @default(true)
-  ultimoLogin      DateTime?        @map("ultimo_login") @db.Timestamptz(6)
-  tokenReset       String?          @map("token_reset") @db.VarChar(255)
-  tokenResetExpira DateTime?        @map("token_reset_expira") @db.Timestamptz(6)
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  logsAlertas      LogsAlertas[]
-  sessoes          SessoesUsuario[]
-
-  @@map("usuarios_admin")
-}
-
-model UsuariosBasicos {
-  id                  String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  nome                String    @db.VarChar(100)
-  email               String    @unique @db.VarChar(255)
-  telefone            String?   @db.VarChar(20)
-  ativo               Boolean   @default(true)
-  receberNotificacoes Boolean   @default(true) @map("receber_notificacoes")
-  tipoNotificacao     String    @default("email,sms") @map("tipo_notificacao") @db.VarChar(50)
-  ultimoAlertaEnviado DateTime? @map("ultimo_alerta_enviado") @db.Timestamptz(6)
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+// Moradores cadastrados pela landing page ("Quero receber alertas").
+model UsuarioBasico {
+  id         Int      @id @default(autoincrement())
+  nome       String   @db.VarChar(100)
+  email      String   @unique @db.VarChar(255)
+  telefone   String?  @db.VarChar(20)
+  localidade String?  @db.VarChar(100)
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
 
   @@map("usuarios_basicos")
 }
 
-model SessoesUsuario {
-  id        String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  usuarioId String        @map("usuario_id") @db.Uuid
-  token     String        @db.VarChar(500)
-  ipAddress String?       @map("ip_address") @db.Inet
-  userAgent String?       @map("user_agent")
-  expiresAt DateTime      @map("expires_at") @db.Timestamptz(6)
-  ativo     Boolean       @default(true)
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  usuario   UsuariosAdmin @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+// Quem faz login no painel e envia os alertas.
+model Administrador {
+  id          Int       @id @default(autoincrement())
+  nome        String    @db.VarChar(100)
+  email       String    @unique @db.VarChar(255)
+  senhaHash   String    @map("senha_hash") @db.VarChar(255)
+  ativo       Boolean   @default(true)
+  ultimoLogin DateTime? @map("ultimo_login") @db.Timestamptz(6)
+  criadoEm    DateTime  @default(now()) @map("criado_em") @db.Timestamptz(6)
+  eventos     Evento[]
 
-  @@map("sessoes_usuario")
-}
-
-model LogsAlertas {
-  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  usuarioAdminId   String?        @map("usuario_admin_id") @db.Uuid
-  tipoDestinatario String         @map("tipo_destinatario") @db.VarChar(20)
-  destinatariosIds String[]       @map("destinatarios_ids") @db.Uuid
-  tipoAlerta       String         @map("tipo_alerta") @db.VarChar(50)
-  nivelCriticidade String         @map("nivel_criticidade") @db.VarChar(20)
-  titulo           String         @db.VarChar(200)
-  mensagem         String
-  canaisEnvio      String         @map("canais_envio") @db.VarChar(100)
-  totalEnviados    Int            @default(0) @map("total_enviados")
-  totalSucesso     Int            @default(0) @map("total_sucesso")
-  totalFalhas      Int            @default(0) @map("total_falhas")
-  detalhesEnvio    Json?          @map("detalhes_envio")
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  usuarioAdmin     UsuariosAdmin? @relation(fields: [usuarioAdminId], references: [id])
-
-  @@map("logs_alertas")
+  @@map("administradores")
 }

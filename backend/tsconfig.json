@@ -1,4 +1,3 @@
-// backend > tsconfig.json
 {
   "compilerOptions": {
     "target": "es2020",
@@ -8,23 +7,12 @@
     "rootDir": "./src",
     "strict": false,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "noImplicitReturns": false,
-    "noImplicitThis": false,
     "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "ts-node": {
-    "esm": false
-  }
+  "exclude": ["node_modules", "dist"]
 }

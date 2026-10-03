@@ -1,34 +1,26 @@
-version: '3.8'
-
 services:
-  # ── Banco de dados PostgreSQL com TimescaleDB ────────────────────────────────
+  # ── Banco de dados PostgreSQL ────────────────────────────────────────────────
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: postgres:15-alpine
     container_name: bndmet-postgres
     environment:
       POSTGRES_DB: bndmet
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: senha123
-      POSTGRES_HOST_AUTH_METHOD: trust
-      PGTZ: UTC
       TZ: UTC
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d/
+      - ./database/init:/docker-entrypoint-initdb.d/   # roda 01-schema.sql na 1ª subida
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d bndmet"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: >
-      postgres
-      -c timezone=UTC
-      -c log_timezone=UTC
 
-  # ── Adminer — interface web para o banco ────────────────────────────────────
+  # ── Adminer — interface web para ver as tabelas ──────────────────────────────
   adminer:
     image: adminer:latest
     container_name: bndmet-adminer
@@ -39,9 +31,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      TZ: UTC
       ADMINER_DEFAULT_SERVER: postgres
-      ADMINER_DESIGN: nette
 
   # ── Backend Node.js ──────────────────────────────────────────────────────────
   backend:
@@ -55,15 +45,10 @@ services:
       TZ: UTC
       NODE_ENV: production
       PORT: 3001
-      # DATABASE_URL aponta para o container postgres (nome do serviço = host)
-      DATABASE_URL: "postgresql://admin:senha123@postgres:5432/bndmet?schema=public&timezone=UTC"
+      DATABASE_URL: "postgresql://admin:senha123@postgres:5432/bndmet?schema=public"
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
-      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
-      BNDMET_API_KEY: ${BNDMET_API_KEY}
-      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
@@ -72,7 +57,6 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Healthcheck do próprio backend
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
       interval: 30s
