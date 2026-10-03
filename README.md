@@ -194,7 +194,7 @@ O arquivo `frontend/.env.local` deve ter `NEXT_PUBLIC_API_URL=http://localhost:3
 | http://localhost:3000/painel | Painel do administrador (página única, atualiza a cada 30 s) |
 
 O painel mostra: nível atual (cor), S, P48, P24, P72, energia (rede/bateria), avisos de
-dado indisponível, histórico (24 h, 7 dias, 30 dias), envio do e-mail de alerta aos
+dado indisponível ou incompleto (P72 mínimo quando faltam dados de chuva), histórico (24 h, 7 dias, 30 dias), envio do e-mail de alerta aos
 moradores, lista de moradores e registros de envios/eventos.
 
 ---

@@ -1,6 +1,7 @@
 // ============= src/components/painel/GraficoHistorico.js =============
 // Histórico de S e de P72. Dois gráficos separados (escalas diferentes, sem eixo duplo).
 // Linhas tracejadas = limiares de atenção e de alerta. Falha de dado aparece como intervalo na linha.
+// P72 com dados de chuva incompletos (P72 nulo) aparece como pontos vazados no mínimo garantido (p72Minimo).
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -21,22 +22,28 @@ const COR_SERIE = '#2563eb';
 const COR_ATENCAO = '#b45309';
 const COR_ALERTA = '#b91c1c';
 
-function DicaTooltip({ active, payload, campo, casas, unidade }) {
+function DicaTooltip({ active, payload, campo, campoMinimo, casas, unidade }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   const valor = p[campo];
+  const minimo = campoMinimo ? p[campoMinimo] : null;
+  const u = unidade ? ` ${unidade}` : '';
+  let texto = 'indisponível';
+  if (valor !== null && valor !== undefined) texto = `${numero(valor, casas)}${u}`;
+  else if (minimo !== null && minimo !== undefined) texto = `≥ ${numero(minimo, casas)}${u} (dados incompletos)`;
   return (
     <div className="dica-grafico">
       <strong>{dataHora(p.criadoEm)}</strong>
       <span>
-        {campo}: {valor === null ? 'indisponível' : `${numero(valor, casas)}${unidade ? ` ${unidade}` : ''}`}
+        {campo}: {texto}
       </span>
       <span>Nível: {p.nivel}</span>
     </div>
   );
 }
 
-function Grafico({ titulo, dados, campo, dominio, casas, unidade, atencao, alerta, fonte, comDia }) {
+function Grafico({ titulo, dados, campo, campoMinimo, dominio, casas, unidade, atencao, alerta, fonte, comDia }) {
+  const temMinimo = !!campoMinimo && dados.some((d) => d[campoMinimo] !== null && d[campoMinimo] !== undefined);
   return (
     <figure className="grafico">
       <figcaption>{titulo}</figcaption>
@@ -73,20 +80,36 @@ function Grafico({ titulo, dados, campo, dominio, casas, unidade, atencao, alert
             strokeDasharray="5 4"
             label={{ value: `Alerta ${numero(alerta, casas === 2 ? 2 : 0)}`, position: 'right', fontSize: 11, fill: '#374151' }}
           />
-          <Tooltip content={<DicaTooltip campo={campo} casas={casas} unidade={unidade} />} />
+          <Tooltip content={<DicaTooltip campo={campo} campoMinimo={campoMinimo} casas={casas} unidade={unidade} />} />
           <Line
             type="monotone"
             dataKey={campo}
             stroke={COR_SERIE}
             strokeWidth={2}
-            dot={dados.length <= 60 ? { r: 3 } : false}
-            activeDot={{ r: 5 }}
+            dot={dados.length <= 60 ? { r: 3, fill: COR_SERIE, stroke: COR_SERIE } : false}
+            activeDot={{ r: 5, fill: COR_SERIE }}
             connectNulls={false}
             isAnimationActive={false}
           />
+          {temMinimo && (
+            <Line
+              type="monotone"
+              dataKey={campoMinimo}
+              stroke={COR_SERIE}
+              strokeWidth={0}
+              dot={{ r: 4, fill: '#ffffff', stroke: COR_SERIE, strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: '#ffffff', stroke: COR_SERIE }}
+              connectNulls={false}
+              isAnimationActive={false}
+              legendType="none"
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
-      <p className="nota">Limiares: {fonte}.</p>
+      <p className="nota">
+        Limiares: {fonte}.
+        {temMinimo && ' Pontos cheios = valor completo; pontos vazados = mínimo garantido (dados de chuva incompletos).'}
+      </p>
     </figure>
   );
 }
@@ -159,6 +182,7 @@ export default function GraficoHistorico({ versao }) {
             titulo="Chuva de 72 h (P72 = P48 + P24), em mm"
             dados={dados}
             campo="P72"
+            campoMinimo="p72Minimo"
             dominio={[0, (max) => Math.max(LIMIARES.P2 * 1.2, Math.ceil(max / 20) * 20)]}
             casas={1}
             unidade="mm"
