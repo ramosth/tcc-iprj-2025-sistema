@@ -1,111 +1,51 @@
-// Context de autenticação
 // ============= src/contexts/AuthContext.js =============
+// Login do administrador (único perfil com acesso ao painel).
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '@/services/api';
-import toast from 'react-hot-toast';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { authApi, mensagemErro, sessao } from '@/services/api';
 
-const AuthContext = createContext({});
+const AuthContext = createContext(null);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider');
-  }
-  return context;
-};
+export function useAuth() {
+  const contexto = useContext(AuthContext);
+  if (!contexto) throw new Error('useAuth deve ser usado dentro de AuthProvider');
+  return contexto;
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+export function AuthProvider({ children }) {
+  const [admin, setAdmin] = useState(null);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    loadUserFromStorage();
+    setAdmin(sessao.ler()?.admin ?? null);
+    setCarregando(false);
+
+    const expirou = () => setAdmin(null);
+    window.addEventListener('sessao-expirada', expirou);
+    return () => window.removeEventListener('sessao-expirada', expirou);
   }, []);
 
-  const loadUserFromStorage = () => {
+  const entrar = useCallback(async (email, senha) => {
     try {
-      const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      
-      if (token && userData) {
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados do usuário:', error);
-      logout();
-    } finally {
-      setLoading(false);
+      const { token, administrador } = await authApi.login(email, senha);
+      sessao.salvar(token, administrador);
+      setAdmin(administrador);
+      return { ok: true };
+    } catch (erro) {
+      return { ok: false, mensagem: mensagemErro(erro, 'Não foi possível entrar.') };
     }
-  };
+  }, []);
 
-  const login = async (email, senha) => {
-    try {
-      const response = await authService.login(email, senha);
-      
-      if (response.success && response.data?.token) {
-        const { token, usuario } = response.data;
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(usuario));
-        
-        setUser(usuario);
-        setIsAuthenticated(true);
-        
-        toast.success('Login realizado com sucesso!');
-        return { success: true };
-      } else {
-        throw new Error(response.message || 'Erro no login');
-      }
-    } catch (error) {
-      const message = error.response?.data?.error || error.message || 'Erro ao fazer login';
-      toast.error(message);
-      return { success: false, message };
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Erro no logout:', error);
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-      setIsAuthenticated(false);
-      toast.success('Logout realizado com sucesso!');
-    }
-  };
-
-  const updateUser = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-  };
-
-  const isAdmin = () => {
-    return user?.perfil === 'admin' || user?.perfil === 'super_admin';
-  };
-
-  const isSuperAdmin = () => {
-    return user?.perfil === 'super_admin';
-  };
+  const sair = useCallback(async () => {
+    await authApi.logout();
+    sessao.limpar();
+    setAdmin(null);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated,
-      loading,
-      login,
-      logout,
-      updateUser,
-      isAdmin,
-      isSuperAdmin
-    }}>
+    <AuthContext.Provider value={{ admin, carregando, entrar, sair }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}

@@ -153,6 +153,28 @@ apontar para o computador onde a API está rodando, na porta 3001 (sem `/api` no
 
 A cada ciclo o serial mostra `[BACKEND] POST /leituras -> 201` quando a API recebeu.
 
+### 4.7 Ligar o site (frontend)
+
+Com a API no ar (porta 3001):
+
+```bash
+cd frontend
+npm install          # só na primeira vez
+npm run dev
+```
+
+O arquivo `frontend/.env.local` deve ter `NEXT_PUBLIC_API_URL=http://localhost:3001/api`.
+
+| Endereço | Tela |
+|---|---|
+| http://localhost:3000 | Página inicial: resumo do projeto e cadastro "Quero receber alertas" |
+| http://localhost:3000/login | Login do administrador (`admin@bndmet.com` / `admin123`) |
+| http://localhost:3000/painel | Painel do administrador (página única, atualiza a cada 30 s) |
+
+O painel mostra: nível atual (cor), S, P48, P24, P72, energia (rede/bateria), avisos de
+dado indisponível, histórico (24 h, 7 dias, 30 dias), envio do e-mail de alerta aos
+moradores, lista de moradores e registros de envios/eventos.
+
 ---
 
 ## 5. Testar a API
@@ -214,7 +236,14 @@ sistema-bndmet/
 │           ├── emailService.ts     envio por SMTP (nodemailer)
 │           ├── usuariosService.ts  cadastro e lista de usuários básicos
 │           └── authService.ts      login do administrador
-└── frontend/                   Next.js (adaptado na etapa do frontend)
+└── frontend/                   Next.js 14
+    └── src/
+        ├── app/                page.js (início), login/, painel/
+        ├── components/         LandingPage, ProtectedRoute, painel/ (um arquivo por bloco)
+        ├── config/niveis.js    níveis, limiares (só exibição) e rodapé
+        ├── contexts/           login do administrador
+        ├── services/api.js     chamadas à API
+        └── styles/globals.css
 ```
 
 ---
