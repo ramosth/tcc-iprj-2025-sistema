@@ -32,6 +32,15 @@ function booleano(corpo: any, campo: string): boolean {
   return valor;
 }
 
+function inteiro(corpo: any, campo: string, min: number, max: number): number {
+  const valor = corpo[campo];
+  if (valor === undefined || valor === null) return 0;
+  if (!Number.isInteger(valor) || valor < min || valor > max) {
+    throw new HttpError(400, `Campo "${campo}" inválido: esperado inteiro entre ${min} e ${max}.`);
+  }
+  return valor;
+}
+
 export function validarLeitura(corpo: any) {
   if (!corpo || typeof corpo !== 'object') throw new HttpError(400, 'Corpo JSON ausente.');
 
@@ -59,6 +68,12 @@ export function validarLeitura(corpo: any) {
     rede = corpo.rede;
   }
 
+  // Dados de chuva incompletos (falta uma parcela ou um dia do BNDMET): o firmware
+  // manda P72 = null e o mínimo garantido em p72Minimo. Fora desse caso, p72Minimo
+  // não tem significado e é descartado.
+  const chuvaIncompleta = booleano(corpo, 'chuvaIncompleta');
+  const p72Minimo = numeroOuNulo(corpo, 'p72Minimo', 0, 10000);
+
   return {
     evento,
     nivel,
@@ -66,12 +81,15 @@ export function validarLeitura(corpo: any) {
     p48: numeroOuNulo(corpo, 'P48', 0, 10000),
     p24: numeroOuNulo(corpo, 'P24', 0, 10000),
     p72: numeroOuNulo(corpo, 'P72', 0, 10000),
+    p72Minimo: chuvaIncompleta ? p72Minimo : null,
+    p48DiasNulos: inteiro(corpo, 'p48DiasNulos', 0, 31),
     rede,
     vbat: numeroOuNulo(corpo, 'vbat', 0, 10),
     estadoBateria,
     sensorIndisponivel: booleano(corpo, 'sensorIndisponivel'),
     p48Indisponivel: booleano(corpo, 'p48Indisponivel'),
     p24Indisponivel: booleano(corpo, 'p24Indisponivel'),
+    chuvaIncompleta,
     semDadosChuva: booleano(corpo, 'semDadosChuva'),
     p72Injetado: booleano(corpo, 'p72Injetado'),
     simulacao: booleano(corpo, 'simulacao'),
@@ -92,12 +110,15 @@ export function formatarLeitura(l: Leitura) {
     P48: num(l.p48),
     P24: num(l.p24),
     P72: num(l.p72),
+    p72Minimo: num(l.p72Minimo),
+    p48DiasNulos: l.p48DiasNulos,
     rede: l.rede,
     vbat: num(l.vbat),
     estadoBateria: l.estadoBateria,
     sensorIndisponivel: l.sensorIndisponivel,
     p48Indisponivel: l.p48Indisponivel,
     p24Indisponivel: l.p24Indisponivel,
+    chuvaIncompleta: l.chuvaIncompleta,
     semDadosChuva: l.semDadosChuva,
     p72Injetado: l.p72Injetado,
     simulacao: l.simulacao,
@@ -129,7 +150,8 @@ export function mudancasEnergia(anterior: Leitura | null, nova: Leitura): string
       BAIXA: `Bateria baixa${v}.`,
       CRITICA: `Bateria crítica${v}: próxima da tensão de corte.`,
       FALHA: 'Falha na bateria: não completou a recarga no tempo previsto. Substituir.',
-      NORMAL: comparar ? `Bateria voltou ao estado normal${v}.` : '',
+      // "voltou ao normal" só quando a anterior tinha estado conhecido e diferente
+      NORMAL: comparar && anterior.estadoBateria !== null ? `Bateria voltou ao estado normal${v}.` : '',
     };
     if (textos[nova.estadoBateria]) mudancas.push(textos[nova.estadoBateria]);
   }

@@ -20,14 +20,17 @@ model Leitura {
   s                  Decimal? @db.Decimal(4, 2) // saturação relativa (0–1)
   p48                Decimal? @db.Decimal(7, 2) // mm, BNDMET
   p24                Decimal? @db.Decimal(7, 2) // mm, OpenWeatherMap
-  p72                Decimal? @db.Decimal(7, 2) // mm, P48 + P24
+  p72                Decimal? @db.Decimal(7, 2) // mm, P48 + P24 (nulo se incompleto)
+  p72Minimo          Decimal? @map("p72_minimo") @db.Decimal(7, 2) // mm, mínimo garantido (só se incompleto)
+  p48DiasNulos       Int      @default(0) @map("p48_dias_nulos") @db.SmallInt // dias sem registro no BNDMET
   rede               Boolean?
   vbat               Decimal? @db.Decimal(4, 2) // V
   estadoBateria      String?  @map("estado_bateria") @db.VarChar(10) // NORMAL | BAIXA | CRITICA | FALHA
   sensorIndisponivel Boolean  @default(false) @map("sensor_indisponivel")
   p48Indisponivel    Boolean  @default(false) @map("p48_indisponivel")
   p24Indisponivel    Boolean  @default(false) @map("p24_indisponivel")
-  semDadosChuva      Boolean  @default(false) @map("sem_dados_chuva")
+  chuvaIncompleta    Boolean  @default(false) @map("chuva_incompleta") // falta uma parcela ou um dia
+  semDadosChuva      Boolean  @default(false) @map("sem_dados_chuva") // nenhuma parcela obtida
   p72Injetado        Boolean  @default(false) @map("p72_injetado")
   simulacao          Boolean  @default(false)
   eventos            Evento[]

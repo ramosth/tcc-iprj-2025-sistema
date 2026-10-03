@@ -79,12 +79,32 @@ function textoMm(valor: any) {
   return valor !== null && valor !== undefined ? `${virgula(Number(valor), 1)} mm` : 'sem dados';
 }
 
+// P48 com dia sem registro na estação é um valor mínimo
+function textoP48(l: Leitura) {
+  if (l.p48 === null) return 'sem dados';
+  if (l.p48DiasNulos > 0) return `≥ ${textoMm(l.p48)} (${l.p48DiasNulos} dia(s) sem registro na estação)`;
+  return textoMm(l.p48);
+}
+
+// P72 completo; ou, com dados incompletos, o mínimo garantido enviado pelo firmware
+function textoP72(l: Leitura | null) {
+  if (!l) return 'sem dados';
+  if (l.p72 !== null) return textoMm(l.p72);
+  if (l.chuvaIncompleta && l.p72Minimo !== null) {
+    return `no mínimo ${textoMm(l.p72Minimo)}, com dados de chuva incompletos`;
+  }
+  return 'sem dados';
+}
+
 function avisos(l: Leitura | null): string[] {
   if (!l) return ['Nenhuma leitura recebida do dispositivo até o momento.'];
   const lista: string[] = [];
   if (l.sensorIndisponivel) lista.push('Sensor de umidade indisponível no momento.');
   if (l.semDadosChuva) lista.push('Sem dados de chuva no momento.');
   else {
+    if (l.chuvaIncompleta && l.p72Minimo !== null) {
+      lista.push(`Dados de chuva incompletos: P72 de no mínimo ${textoMm(l.p72Minimo)}.`);
+    }
     if (l.p48Indisponivel) lista.push('Chuva observada (BNDMET) indisponível no momento.');
     if (l.p24Indisponivel) lista.push('Previsão de chuva (OpenWeatherMap) indisponível no momento.');
   }
@@ -95,7 +115,7 @@ function preencher(mensagem: string, l: Leitura | null): string {
   return mensagem
     .split('{data_hora}').join(dataHora(l ? l.criadoEm : new Date()))
     .split('{S}').join(textoS(l))
-    .split('{P72}').join(textoMm(l ? l.p72 : null))
+    .split('{P72}').join(textoP72(l))
     .split('{aviso_dado_indisponivel}').join(avisos(l).join(' '))
     .trim();
 }
@@ -146,9 +166,9 @@ export class EventosService {
       'Olá, {nome}.',
       `Em ${dataHora(l.criadoEm)}, o nível do monitoramento subiu de ${de} para ${l.nivel}.`,
       `Saturação do solo (S): ${textoS(l)}`,
-      `Chuva observada 48 h (P48): ${textoMm(l.p48)}`,
+      `Chuva observada 48 h (P48): ${textoP48(l)}`,
       `Chuva prevista 24 h (P24): ${textoMm(l.p24)}`,
-      `Chuva 72 h (P72): ${textoMm(l.p72)}`,
+      `Chuva 72 h (P72): ${textoP72(l)}`,
       ...avisos(l),
       ...marcasTeste(l),
       'Acesse o painel para decidir o envio do alerta aos moradores cadastrados.',

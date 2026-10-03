@@ -42,14 +42,27 @@ Rotas "admin" exigem o cabeçalho `Authorization: Bearer <token>`.
 
 ```json
 {"evento":"ciclo","nivel":"AMARELO","S":0.75,"P48":30,"P24":50,"P72":80,
- "rede":true,"vbat":4.20,"estadoBateria":"NORMAL","sensorIndisponivel":false,
- "p48Indisponivel":false,"p24Indisponivel":false,"semDadosChuva":false,
- "p72Injetado":false,"simulacao":true}
+ "p48DiasNulos":0,"rede":true,"vbat":4.20,"estadoBateria":"NORMAL",
+ "sensorIndisponivel":false,"p48Indisponivel":false,"p24Indisponivel":false,
+ "chuvaIncompleta":false,"semDadosChuva":false,"p72Injetado":false,"simulacao":true}
+```
+
+Com dados de chuva incompletos (ex.: um dia sem registro no BNDMET):
+
+```json
+{"evento":"ciclo","nivel":"AMARELO","S":0.75,"P48":45,"P24":20,"P72":null,
+ "p72Minimo":65,"p48DiasNulos":1,"chuvaIncompleta":true,"semDadosChuva":false, ...}
 ```
 
 - Obrigatório: `nivel`. Os demais podem faltar ou vir `null`.
 - `evento`: `"ciclo"` (leitura periódica) ou `"energia"` (mudou a rede ou a bateria).
-- O protótipo físico não envia `rede`, `vbat` nem `estadoBateria` (ficam nulos).
+- `p48DiasNulos`: inteiro de 0 a 31 (dias sem registro no BNDMET; ausente = 0).
+- `chuvaIncompleta`: falta uma parcela (P48 ou P24) ou um dia do BNDMET. Nesse caso
+  `P72` vem `null` e `p72Minimo` traz o mínimo garantido (soma do que foi obtido).
+  `p72Minimo` sem `chuvaIncompleta: true` é ignorado.
+- `semDadosChuva`: só `true` quando nenhuma parcela foi obtida.
+- O protótipo físico não envia `rede`, `vbat` nem `estadoBateria` (ficam nulos). JSON sem
+  os campos de chuva incompleta continua aceito (valores padrão: 0, false, null).
 
 ---
 
@@ -57,13 +70,22 @@ Rotas "admin" exigem o cabeçalho `Authorization: Bearer <token>`.
 
 | Tabela | Conteúdo |
 |---|---|
-| `leituras` | Uma linha por JSON recebido: nível, S, P48, P24, P72, energia e avisos de dado indisponível |
+| `leituras` | Uma linha por JSON recebido: nível, S, P48, P24, P72 (ou P72 mínimo, se incompleto), energia e avisos de dado indisponível/incompleto |
 | `eventos` | Nível subiu, evento de energia e alerta enviado pelo administrador (com quem enviou e quantos receberam) |
 | `usuarios_basicos` | Moradores que pediram para receber alertas |
 | `administradores` | Quem faz login no painel |
 
 O script `database/init/01-schema.sql` cria as tabelas. O `backend/prisma/schema.prisma`
 descreve as mesmas tabelas para o Prisma (os dois arquivos devem andar juntos).
+
+Banco criado antes dos campos de chuva incompleta (`p72_minimo`, `p48_dias_nulos`,
+`chuva_incompleta`)? Atualize sem apagar os dados:
+
+```bash
+docker exec -i bndmet-postgres psql -U admin -d bndmet < database/atualizacoes/01-chuva-incompleta.sql
+```
+
+(ou, com o backend fora do Docker: `cd backend && npx prisma db push`).
 
 ---
 
@@ -221,6 +243,7 @@ Administrador padrão criado pelo `01-schema.sql`: `admin@bndmet.com` / `admin12
 sistema-bndmet/
 ├── docker-compose.yml          PostgreSQL + Adminer + backend
 ├── database/init/01-schema.sql cria as 4 tabelas e o administrador padrão
+├── database/atualizacoes/      ajustes para banco já existente (ALTER TABLE)
 ├── backend/
 │   ├── .env.example
 │   ├── prisma/schema.prisma    mesmas 4 tabelas, para o Prisma

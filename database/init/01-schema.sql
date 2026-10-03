@@ -15,14 +15,17 @@ CREATE TABLE IF NOT EXISTS leituras (
     s                    DECIMAL(4,2),                            -- saturação relativa 0–1
     p48                  DECIMAL(7,2),                            -- mm (BNDMET)
     p24                  DECIMAL(7,2),                            -- mm (OpenWeatherMap)
-    p72                  DECIMAL(7,2),                            -- mm (P48 + P24)
+    p72                  DECIMAL(7,2),                            -- mm (P48 + P24); nulo se incompleto
+    p72_minimo           DECIMAL(7,2),                            -- mm, mínimo garantido (só se incompleto)
+    p48_dias_nulos       SMALLINT NOT NULL DEFAULT 0,             -- dias sem registro no BNDMET
     rede                 BOOLEAN,                                 -- nulo no protótipo físico
     vbat                 DECIMAL(4,2),                            -- V
     estado_bateria       VARCHAR(10),                             -- NORMAL | BAIXA | CRITICA | FALHA
     sensor_indisponivel  BOOLEAN NOT NULL DEFAULT false,
     p48_indisponivel     BOOLEAN NOT NULL DEFAULT false,
     p24_indisponivel     BOOLEAN NOT NULL DEFAULT false,
-    sem_dados_chuva      BOOLEAN NOT NULL DEFAULT false,
+    chuva_incompleta     BOOLEAN NOT NULL DEFAULT false,          -- falta uma parcela ou um dia
+    sem_dados_chuva      BOOLEAN NOT NULL DEFAULT false,          -- nenhuma parcela obtida
     p72_injetado         BOOLEAN NOT NULL DEFAULT false,          -- cenário de teste (comando "chuva")
     simulacao            BOOLEAN NOT NULL DEFAULT false
 );
